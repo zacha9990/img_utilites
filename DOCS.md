@@ -439,6 +439,8 @@ Urutan eksekusi: crop square → resize 500×500 → histogram match → preset 
 | `-o`, `--output PATH` | File output atau direktori tujuan |
 | `--overwrite` | Timpa file jika sudah ada (default: skip) |
 
+Jika `--output` adalah direktori, ekstensi file output mengikuti `--format` yang diberikan. Contoh: `--format webp --output ./out/` akan menghasilkan file `.webp` di folder tersebut.
+
 Jika `--output` tidak diberikan, nama file dibuat otomatis di samping file input:
 
 | Opsi yang digunakan | Contoh nama output |

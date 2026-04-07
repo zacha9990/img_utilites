@@ -720,7 +720,8 @@ def build_output_path(input_path, args):
         out = Path(args.output)
         if out.is_dir() or str(args.output).endswith(("/", "\\")):
             out.mkdir(parents=True, exist_ok=True)
-            return out / input_path.name
+            ext = f".{args.format.lower()}" if args.format else input_path.suffix
+            return out / (input_path.stem + ext)
         return out
 
     stem = input_path.stem
