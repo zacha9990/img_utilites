@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-img__utilites-blue)](https://github.com/zacha9990/img_utilites)
 
-Tool CLI Python untuk resize, smart crop, konversi format, color grading, dan rounded corners gambar.
+Tool CLI Python untuk resize, smart crop, konversi format, color grading, rounded corners, rotate, flip, letterbox padding, dan batch paralel.
 
 **Repository:** https://github.com/zacha9990/img_utilites
 
@@ -11,8 +11,11 @@ Tool CLI Python untuk resize, smart crop, konversi format, color grading, dan ro
 - [Instalasi](#instalasi)
 - [Penggunaan Dasar](#penggunaan-dasar)
 - [Fitur: Resize](#fitur-resize)
+- [Fitur: Letterbox / Padding](#fitur-letterbox--padding)
 - [Fitur: Smart Crop](#fitur-smart-crop)
+- [Fitur: Rotate & Flip](#fitur-rotate--flip)
 - [Fitur: Konversi Format](#fitur-konversi-format)
+- [Fitur: Strip EXIF](#fitur-strip-exif)
 - [Fitur: Rounded Corners](#fitur-rounded-corners)
 - [Fitur: Color Grading](#fitur-color-grading)
   - [Tone Preset](#tone-preset)
@@ -24,6 +27,7 @@ Tool CLI Python untuk resize, smart crop, konversi format, color grading, dan ro
 - [Opsi Output](#opsi-output)
 - [Batch Processing](#batch-processing)
 - [Referensi Argumen](#referensi-argumen)
+- [Struktur Proyek](#struktur-proyek)
 
 ---
 
@@ -32,14 +36,30 @@ Tool CLI Python untuk resize, smart crop, konversi format, color grading, dan ro
 **Dependensi wajib:**
 
 ```bash
-pip install Pillow
+pip install Pillow>=9.0.0
 ```
 
-**Dependensi opsional** (meningkatkan kualitas/fitur tertentu):
+**Dependensi direkomendasikan** (aktifkan fitur penuh):
 
 ```bash
-pip install numpy                  # Tone/color matching LAB yang lebih akurat
-pip install opencv-python numpy    # Face detection untuk smart crop
+pip install numpy tqdm
+```
+
+- `numpy` → LAB-space color/tone matching yang lebih akurat
+- `tqdm` → progress bar saat batch processing
+
+**Dependensi opsional:**
+
+```bash
+pip install opencv-python    # Face detection untuk smart crop
+```
+
+**Install semuanya:**
+
+```bash
+pip install -r requirements.txt
+# atau
+pip install ".[full]"
 ```
 
 ---
@@ -48,6 +68,8 @@ pip install opencv-python numpy    # Face detection untuk smart crop
 
 ```bash
 python imgconv.py <input> [opsi...]
+# atau lewat package
+python -m imgconv <input> [opsi...]
 ```
 
 Minimal satu opsi harus diberikan. Beberapa opsi bisa dikombinasikan sekaligus.
@@ -74,6 +96,9 @@ Mengubah ukuran gambar. Secara default **proporsional** (tidak melar).
 | Argumen | Keterangan |
 |---|---|
 | `-s`, `--size SIZE` | Target ukuran |
+| `--stretch` | Resize paksa ke WxH tanpa mempertahankan rasio |
+| `--resample FILTER` | Filter resampling: `lanczos` (default), `bicubic`, `bilinear`, `nearest` |
+| `--no-upscale` | Skip resize jika hasilnya lebih besar dari ukuran asli |
 
 ### Format SIZE
 
@@ -84,37 +109,65 @@ Mengubah ukuran gambar. Secara default **proporsional** (tidak melar).
 | `xH` | `x600` | Tinggi 600 px, lebar otomatis |
 | `N%` | `50%` | Skala ke N% dari ukuran asli |
 
-### Opsi Tambahan
+### Contoh
+
+```bash
+python imgconv.py foto.jpg --size 1920x1080
+python imgconv.py foto.jpg --size 800x
+python imgconv.py foto.jpg --size 50%
+python imgconv.py foto.jpg --size 500x500 --stretch
+python imgconv.py foto.jpg --size 1920x1080 --no-upscale   # tidak diperbesar
+```
+
+---
+
+## Fitur: Letterbox / Padding
+
+Fit gambar ke ukuran tertentu **tanpa crop** — area kosong diisi padding (warna atau transparan). Berguna untuk thumbnail e-commerce, posting media sosial, dll.
+
+### Opsi
 
 | Argumen | Keterangan |
 |---|---|
-| `--stretch` | Resize paksa ke WxH tanpa mempertahankan rasio |
-| `--resample FILTER` | Filter resampling: `lanczos` (default), `bicubic`, `bilinear`, `nearest` |
+| `--pad` | Aktifkan letterbox mode (butuh `--size WxH`) |
+| `--pad-color COLOR` | Warna padding: nama warna, `#hex`, atau `transparent` (default: `black`) |
+
+### Perilaku
+
+1. Gambar di-resize secara proporsional agar muat di dalam `WxH`
+2. Canvas `WxH` dibuat dengan `pad-color`
+3. Gambar di-paste di tengah canvas
+
+### Catatan
+
+- `--pad` hanya berlaku jika `--size WxH` (kedua dimensi harus ditentukan)
+- `--pad-color transparent` menghasilkan RGBA; output auto-switch ke PNG/WebP jika format tidak mendukung alpha
+- `--no-upscale` + `--pad` = konten gambar tidak diperbesar, tapi canvas tetap dicapai ukuran penuh
 
 ### Contoh
 
 ```bash
-# Resize proporsional, muat dalam 1920x1080
-python imgconv.py foto.jpg --size 1920x1080
+# Letterbox 1920x1080 dengan background hitam
+python imgconv.py foto.jpg --size 1920x1080 --pad
 
-# Lebar 800px, tinggi mengikuti rasio
-python imgconv.py foto.jpg --size 800x
+# Background putih
+python imgconv.py foto.jpg --size 800x800 --pad --pad-color white
 
-# Skala 50%
-python imgconv.py foto.jpg --size 50%
+# Background warna custom
+python imgconv.py foto.jpg --size 800x600 --pad --pad-color "#1a1a2e"
 
-# Stretch paksa ke 500x500 (bisa melar)
-python imgconv.py foto.jpg --size 500x500 --stretch
+# Background transparan (output PNG)
+python imgconv.py foto.jpg --size 500x500 --pad --pad-color transparent --format png
 
-# Resize dengan filter bicubic
-python imgconv.py foto.jpg --size 1280x --resample bicubic
+# Batch thumbnail produk
+python imgconv.py *.jpg --size 800x800 --pad --pad-color white --output ./thumbnails/
 ```
 
 ---
 
 ## Fitur: Smart Crop
 
-Memotong gambar ke rasio aspek tertentu secara cerdas — bukan sekadar center crop.
+Memotong gambar ke rasio aspek tertentu secara cerdas.
 
 ### Opsi
 
@@ -131,14 +184,6 @@ Memotong gambar ke rasio aspek tertentu secara cerdas — bukan sekadar center c
 | Rasio kolom:baris | `16:9`, `4:3`, `1:1`, `9:16`, `3:2`, `21:9`, `5:4` |
 | Bilangan desimal | `1.78`, `0.5625` |
 
-### Preset Rasio
-
-| Preset | Rasio |
-|---|---|
-| `landscape` | 16:9 |
-| `portrait` | 9:16 |
-| `square` | 1:1 |
-
 ### Strategi Crop (`--crop-method`)
 
 | Strategi | Perilaku |
@@ -151,31 +196,58 @@ Memotong gambar ke rasio aspek tertentu secara cerdas — bukan sekadar center c
 ### Contoh
 
 ```bash
-# Crop ke 16:9, strategi otomatis
 python imgconv.py foto.jpg --crop 16:9
-
-# Crop portrait dengan prioritas wajah
 python imgconv.py foto.jpg --crop portrait --crop-method faces
-
-# Crop ke rasio khusus dengan entropy
-python imgconv.py foto.jpg --crop 2.35 --crop-method entropy
-
-# Crop + resize sekaligus
 python imgconv.py foto.jpg --crop 16:9 --size 1920x1080
+```
+
+---
+
+## Fitur: Rotate & Flip
+
+### Rotate
+
+Memutar gambar. Canvas otomatis diperbesar agar gambar muat.
+
+| Argumen | Keterangan |
+|---|---|
+| `--rotate DEG` | Putar searah jarum jam `DEG` derajat (bisa desimal) |
+
+```bash
+python imgconv.py foto.jpg --rotate 90          # 90° searah jarum jam
+python imgconv.py foto.jpg --rotate -90         # 90° berlawanan jarum jam
+python imgconv.py foto.jpg --rotate 180         # balik 180°
+python imgconv.py foto.jpg --rotate 45          # 45° (canvas diperlebar)
+python imgconv.py *.jpg --rotate 90 --output ./rotated/
+```
+
+### Flip
+
+Membalik gambar secara horizontal, vertikal, atau keduanya.
+
+| Argumen | Nilai | Keterangan |
+|---|---|---|
+| `--flip DIR` | `h` / `horizontal` | Mirror kiri-kanan |
+| | `v` / `vertical` | Balik atas-bawah |
+| | `both` | Keduanya |
+
+```bash
+python imgconv.py foto.jpg --flip h              # mirror
+python imgconv.py foto.jpg --flip v              # flip vertikal
+python imgconv.py foto.jpg --flip both
+python imgconv.py *.jpg --flip h --output ./mirrored/
 ```
 
 ---
 
 ## Fitur: Konversi Format
 
-Mengubah format gambar ke format lain.
-
 ### Opsi
 
 | Argumen | Keterangan |
 |---|---|
 | `-f`, `--format FMT` | Format output |
-| `-q`, `--quality N` | Kualitas 1–95 untuk JPEG/WebP (default: 85) |
+| `-q`, `--quality N` | Kualitas 1–95 untuk JPEG/WebP/AVIF (default: 85) |
 
 ### Format yang Didukung
 
@@ -184,85 +256,63 @@ Mengubah format gambar ke format lain.
 | `jpg`, `jpeg` | JPEG |
 | `png` | PNG |
 | `webp` | WebP |
+| `avif` | AVIF (butuh Pillow ≥ 9.1 dengan dukungan libavif) |
 | `bmp` | BMP |
 | `gif` | GIF |
 | `tiff`, `tif` | TIFF |
 | `ico` | ICO |
 
-Konversi mode warna ditangani otomatis — misalnya RGBA ke JPEG akan menghasilkan background putih.
-
 ### Contoh
 
 ```bash
-# Konversi ke WebP dengan kualitas tinggi
 python imgconv.py foto.jpg --format webp --quality 90
-
-# Konversi ke PNG (lossless)
-python imgconv.py foto.jpg --format png
-
-# Konversi seluruh folder ke WebP
+python imgconv.py foto.jpg --format avif
 python imgconv.py *.jpg --format webp --output ./webp/
+```
+
+---
+
+## Fitur: Strip EXIF
+
+Menghapus metadata EXIF dan ICC profile dari output — berguna untuk privasi (GPS, info perangkat) sebelum publish ke web.
+
+| Argumen | Keterangan |
+|---|---|
+| `--strip-exif` | Hapus EXIF dan ICC metadata |
+
+```bash
+python imgconv.py foto.jpg --strip-exif --format webp
+python imgconv.py *.jpg --strip-exif --output ./clean/
 ```
 
 ---
 
 ## Fitur: Rounded Corners
 
-Membuat pojok-pojok gambar melengkung dengan area sudut menjadi **transparan**. Karena membutuhkan alpha channel, output otomatis disimpan sebagai **PNG** (atau WebP) meskipun input berformat JPEG.
+Membuat pojok gambar melengkung (area sudut transparan). Output otomatis ke PNG/WebP/AVIF.
 
 ### Opsi
 
 | Argumen | Keterangan |
 |---|---|
-| `--radius N` | Radius sudut dalam piksel (`30`) atau persen sisi terpendek (`5%`) |
-
-### Format Radius
-
-| Format | Contoh | Perilaku |
-|---|---|---|
-| Piksel absolut | `30` | Radius 30px di setiap sudut |
-| Persen | `5%` | 5% dari sisi terpendek gambar |
-| `50%` | Bentuk oval/lingkaran penuh (pill untuk landscape) |
-
-### Catatan Format Output
-
-Karena sudut transparan membutuhkan alpha channel:
-- Output ke **PNG** atau **WebP** — berjalan normal
-- Output ke **JPEG** atau format lain yang tidak mendukung alpha — otomatis diubah ke PNG dengan pesan notifikasi
+| `--radius N` | Radius dalam piksel (`30`) atau persen sisi terpendek (`5%`) |
 
 ### Contoh
 
 ```bash
-# Rounded corners 30px
 python imgconv.py foto.jpg --radius 30
-
-# Rounded corners 5% dari sisi terpendek
 python imgconv.py foto.jpg --radius 5%
-
-# Sudut sangat melengkung (hampir oval)
-python imgconv.py foto.jpg --radius 40%
-
-# Eksplisit simpan ke PNG
-python imgconv.py foto.jpg --radius 20 --format png
-
-# Batch: semua foto dengan sudut melengkung
-python imgconv.py *.jpg --radius 30 --output ./rounded/
-
-# Kombinasi: crop square + rounded + resize
 python imgconv.py foto.jpg --crop square --size 500x500 --radius 50% --output avatar.png
+python imgconv.py *.jpg --radius 30 --output ./rounded/
 ```
 
 ---
 
 ## Fitur: Color Grading
 
-Mengubah warna, tone, dan nuansa gambar. Semua opsi color grading bisa dikombinasikan satu sama lain maupun dengan resize/crop.
-
 ---
 
 ### Tone Preset
-
-Menerapkan gaya warna siap pakai dengan satu argumen.
 
 ```bash
 --tone PRESET
@@ -270,122 +320,64 @@ Menerapkan gaya warna siap pakai dengan satu argumen.
 
 | Preset | Efek |
 |---|---|
-| `warm` | Hangat kemerahan/kekuningan, saturasi sedikit naik |
+| `warm` | Hangat kemerahan/kekuningan |
 | `cool` | Dingin kebiruan/cyan |
-| `vintage` | Kekuningan, kontras rendah, sedikit gelap — gaya film lama |
-| `fade` | Bayangan terangkat, warna pudar, kontras rendah |
-| `vibrant` | Warna sangat jenuh dan vivid, kontras naik |
-| `dramatic` | Kontras tinggi, hampir monokrom, gelap dan kuat |
-| `matte` | Blacks terangkat, flat/milky look, kontras sangat rendah |
-
-#### Contoh
+| `vintage` | Kekuningan, kontras rendah, gaya film lama |
+| `fade` | Bayangan terangkat, warna pudar |
+| `vibrant` | Warna sangat jenuh dan vivid |
+| `dramatic` | Kontras tinggi, hampir monokrom |
+| `matte` | Blacks terangkat, flat/milky look |
 
 ```bash
 python imgconv.py foto.jpg --tone warm
-python imgconv.py foto.jpg --tone vintage
 python imgconv.py *.jpg --tone matte --output ./matte/
-
-# Kombinasi preset + penyesuaian manual
-python imgconv.py foto.jpg --tone vintage --saturation 0.6
 ```
 
 ---
 
 ### Penyesuaian Manual
 
-Kontrol granular untuk setiap aspek warna.
-
-| Argumen | Default | Rentang Umum | Keterangan |
+| Argumen | Default | Rentang | Keterangan |
 |---|---|---|---|
-| `--brightness N` | `1.0` | `0.5` – `2.0` | Kecerahan: `<1` gelap, `>1` terang |
-| `--contrast N` | `1.0` | `0.5` – `2.0` | Kontras: `<1` flat, `>1` tajam |
-| `--saturation N` | `1.0` | `0.0` – `2.0` | Saturasi: `0` = grayscale, `>1` vivid |
-| `--temperature N` | `0` | `-100` – `+100` | Suhu warna: negatif = lebih hangat, positif = lebih dingin |
-
-#### Contoh
+| `--brightness N` | `1.0` | `0.5`–`2.0` | Kecerahan |
+| `--contrast N` | `1.0` | `0.5`–`2.0` | Kontras |
+| `--saturation N` | `1.0` | `0.0`–`2.0` | Saturasi; `0` = grayscale |
+| `--temperature N` | `0` | `-100`–`+100` | Suhu warna: negatif = lebih hangat |
 
 ```bash
-# Terangkan dan tingkatkan saturasi
 python imgconv.py foto.jpg --brightness 1.2 --saturation 1.3
-
-# Grayscale
-python imgconv.py foto.jpg --saturation 0
-
-# Tone hangat manual
-python imgconv.py foto.jpg --temperature -50
-
-# Tone dingin dengan kontras lebih rendah
-python imgconv.py foto.jpg --temperature 40 --contrast 0.9
-
-# Gabungkan semua
-python imgconv.py foto.jpg --brightness 1.1 --contrast 1.2 --saturation 1.4 --temperature -20
+python imgconv.py foto.jpg --saturation 0       # grayscale
+python imgconv.py foto.jpg --temperature -50    # hangat
 ```
 
 ---
 
 ### Tone Matching dari Referensi
 
-Menyamakan tone **dan** warna gambar target secara akurat mengikuti satu foto referensi, menggunakan histogram CDF matching. Ini adalah cara yang tepat untuk membuat batch foto terlihat seragam.
-
 ```bash
 --match-tone REF
 ```
 
-#### Cara Kerja
-
-Algoritma memetakan distribusi pixel secara penuh — bukan hanya rata-rata dan standar deviasi:
-
-1. Hitung **CDF (Cumulative Distribution Function)** dari setiap channel di ruang warna CIE LAB
-2. Untuk setiap nilai pixel sumber, temukan nilai referensi yang memiliki **ranking CDF yang sama**
-3. Terapkan pemetaan tersebut ke seluruh gambar
-
-Hasilnya: distribusi histogram output identik dengan referensi, termasuk kurva exposure, distribusi shadow/midtone/highlight, dan nuansa warna.
-
-- Jika **numpy tersedia**: matching dilakukan di ruang warna **CIE LAB** (1024 bins per channel) — luminance dan warna diproses terpisah, hasil lebih natural
-- Jika **numpy tidak ada**: fallback ke matching **RGB per-channel** menggunakan PIL
-
-#### Contoh
+CDF-based histogram matching di ruang warna CIE LAB. Menyamakan distribusi pixel penuh termasuk kurva exposure, shadow/midtone/highlight, dan warna.
 
 ```bash
-# Samakan satu foto ke referensi
 python imgconv.py foto.jpg --match-tone referensi.jpg
-
-# Batch: samakan seluruh folder ke satu foto referensi
 python imgconv.py *.jpg --match-tone golden_hour.jpg --output ./matched/
-
-# Batch dengan resize sekaligus
-python imgconv.py *.jpg --match-tone referensi.jpg --size 1920x --output ./out/
-
-# Match tone + tambah fine-tuning manual
-python imgconv.py *.jpg --match-tone referensi.jpg --brightness 1.05 --output ./out/
 ```
 
 ---
 
 ### Color Matching dari Referensi
 
-Mentransfer gaya warna dari foto referensi menggunakan metode Reinhard LAB mean/std transfer — lebih cepat, cocok untuk menerapkan mood warna secara umum.
-
 ```bash
 --match-color REF
 ```
 
-#### Cara Kerja
-
-- Jika **numpy tersedia**: **LAB color transfer** (Reinhard et al. 2001) — menyamakan mean dan standar deviasi tiap channel di ruang CIE LAB
-- Jika **numpy tidak ada**: fallback ke **RGB channel matching** — menyamakan statistik per channel R, G, B
-
-#### Contoh
+Reinhard LAB mean/std transfer — lebih cepat, cocok untuk menerapkan mood warna umum.
 
 ```bash
-# Samakan color cast satu foto ke referensi
 python imgconv.py foto.jpg --match-color referensi.jpg
-
-# Batch: transfer mood warna dari referensi
 python imgconv.py *.jpg --match-color cinematic.jpg --output ./graded/
-
-# Match color + tone preset di atas
-python imgconv.py *.jpg --match-color referensi.jpg --tone warm --output ./out/
 ```
 
 ---
@@ -395,40 +387,19 @@ python imgconv.py *.jpg --match-color referensi.jpg --tone warm --output ./out/
 | | `--match-tone` | `--match-color` |
 |---|---|---|
 | **Algoritma** | Histogram CDF matching | Reinhard LAB mean/std transfer |
-| **Yang disamakan** | Distribusi pixel penuh (CDF) | Rata-rata dan standar deviasi |
-| **Akurasi tone** | Sangat tinggi — kurva shadow/midtone/highlight ikut | Sedang — hanya statistik global |
-| **Kecepatan** | Lebih lambat (numpy) | Lebih cepat |
-| **Cocok untuk** | Menyeragamkan batch foto secara akurat | Menerapkan mood/gaya warna umum |
-| **Kebutuhan** | numpy (direkomendasikan) | numpy (direkomendasikan) |
-
-**Kapan pakai `--match-tone`**: kamu punya 1 foto yang sudah diedit (expose, kontras, warna sudah pas) dan ingin seluruh batch foto terlihat identik dengannya.
-
-**Kapan pakai `--match-color`**: kamu ingin menerapkan nuansa warna dari sebuah foto referensi tapi tidak perlu akurasi distribusi penuh — lebih seperti "color grade" daripada "color copy".
+| **Akurasi** | Sangat tinggi | Sedang |
+| **Kecepatan** | Lebih lambat | Lebih cepat |
+| **Cocok untuk** | Menyeragamkan batch secara akurat | Menerapkan mood warna umum |
 
 ---
 
 ### Urutan Pemrosesan
 
-Ketika beberapa opsi digunakan bersamaan, urutan eksekusinya adalah:
-
 ```
-crop → resize → match-tone → match-color → tone preset → manual adjustments → rounded corners
+crop → resize → pad → rotate → flip →
+match-tone → match-color → tone preset → manual adjustments →
+rounded corners → save
 ```
-
-Rounded corners selalu dijalankan **terakhir** agar masking diterapkan pada gambar yang sudah final.
-
-Contoh kombinasi penuh:
-
-```bash
-python imgconv.py foto.jpg \
-  --crop square \
-  --size 500x500 \
-  --match-tone referensi.jpg \
-  --tone warm \
-  --radius 50%
-```
-
-Urutan eksekusi: crop square → resize 500×500 → histogram match → preset warm → rounded corners 50% (lingkaran penuh)
 
 ---
 
@@ -438,52 +409,38 @@ Urutan eksekusi: crop square → resize 500×500 → histogram match → preset 
 |---|---|
 | `-o`, `--output PATH` | File output atau direktori tujuan |
 | `--overwrite` | Timpa file jika sudah ada (default: skip) |
-
-Jika `--output` adalah direktori, ekstensi file output mengikuti `--format` yang diberikan. Contoh: `--format webp --output ./out/` akan menghasilkan file `.webp` di folder tersebut.
-
-Jika `--output` tidak diberikan, nama file dibuat otomatis di samping file input:
-
-| Opsi yang digunakan | Contoh nama output |
-|---|---|
-| `--crop 16:9` | `foto_16-9.jpg` |
-| `--size 800x` | `foto_800x.jpg` |
-| `--match-tone ref.jpg` | `foto_tone.jpg` |
-| `--match-color ref.jpg` | `foto_matched.jpg` |
-| `--tone warm` | `foto_warm.jpg` |
-| `--radius 30` | `foto_r30.png` |
-| `--radius 5%` | `foto_r5pct.png` |
-| `--crop 1:1 --size 500x --radius 50%` | `foto_1-1_500x_r50pct.png` |
+| `--dry-run` | Preview operasi tanpa menulis file apapun |
 
 ```bash
-# Output ke file tertentu
-python imgconv.py foto.jpg --match-tone ref.jpg --output foto_graded.jpg
-
-# Output ke direktori
-python imgconv.py *.jpg --match-tone ref.jpg --output ./output/
-
-# Timpa file yang ada
-python imgconv.py foto.jpg --tone warm --output foto.jpg --overwrite
+python imgconv.py foto.jpg --tone warm --output foto_warm.jpg
+python imgconv.py *.jpg --tone warm --output ./output/
+python imgconv.py *.jpg --tone warm --dry-run    # cek dulu sebelum proses
 ```
 
 ---
 
 ## Batch Processing
 
-Semua fitur mendukung pemrosesan banyak file sekaligus.
+Semua fitur mendukung pemrosesan banyak file sekaligus. Gunakan `-j N` untuk pemrosesan paralel.
 
 ```bash
-# Wildcard
+# Batch sekuensial
 python imgconv.py *.jpg --match-tone referensi.jpg --output ./matched/
+
+# Batch paralel (4 worker processes)
+python imgconv.py *.jpg --match-tone ref.jpg -j 4 --output ./matched/
+
+# Deteksi jumlah CPU otomatis (coba python -c "import os; print(os.cpu_count())")
+python imgconv.py *.jpg --tone vintage -j 8 --output ./out/
 
 # Beberapa file eksplisit
 python imgconv.py a.jpg b.jpg c.jpg --size 1280x --output ./resized/
 
-# Subdirektori
-python imgconv.py photos/*.jpg --match-tone ref.jpg --output ./graded/
-
-# Kombinasi lengkap: samakan tone + resize + konversi format
-python imgconv.py *.jpg --match-tone ref.jpg --size 1920x --format webp --output ./out/
+# Kombinasi lengkap + paralel
+python imgconv.py *.jpg --match-tone ref.jpg --size 1920x --format webp -j 4 --output ./out/
 ```
+
+**Catatan:** Progress bar otomatis tampil saat batch jika `tqdm` terinstal (`pip install tqdm`).
 
 ---
 
@@ -493,19 +450,48 @@ python imgconv.py *.jpg --match-tone ref.jpg --size 1920x --format webp --output
 |---|---|---|---|---|
 | `inputs` | — | positional | — | Satu atau lebih file input |
 | `--size` | `-s` | string | — | Target ukuran: `WxH`, `Wx`, `xH`, `N%` |
+| `--stretch` | — | flag | `false` | Resize non-proporsional |
+| `--no-upscale` | — | flag | `false` | Skip resize jika akan memperbesar |
+| `--resample` | — | pilihan | `lanczos` | Filter resampling |
+| `--pad` | — | flag | `false` | Letterbox mode (butuh `--size WxH`) |
+| `--pad-color` | — | string | `black` | Warna padding |
 | `--crop` | `-c` | string | — | Target rasio crop |
 | `--crop-method` | — | pilihan | `auto` | Strategi crop |
+| `--rotate` | — | float | — | Rotasi searah jarum jam dalam derajat |
+| `--flip` | — | `h`/`v`/`both` | — | Flip gambar |
 | `--format` | `-f` | string | — | Format output |
-| `--quality` | `-q` | int 1–95 | `85` | Kualitas JPEG/WebP |
-| `--stretch` | — | flag | `false` | Resize non-proporsional |
-| `--resample` | — | pilihan | `lanczos` | Filter resampling |
+| `--quality` | `-q` | int 1–95 | `85` | Kualitas JPEG/WebP/AVIF |
 | `--output` | `-o` | path | auto | File atau direktori output |
 | `--overwrite` | — | flag | `false` | Izinkan timpa file |
+| `--strip-exif` | — | flag | `false` | Hapus metadata EXIF/ICC |
 | `--tone` | — | string | — | Preset tone warna |
-| `--radius` | — | string | — | Radius sudut: piksel (`30`) atau persen (`5%`) |
-| `--match-tone` | — | path | — | Foto referensi untuk histogram tone matching |
-| `--match-color` | — | path | — | Foto referensi untuk LAB color transfer |
+| `--radius` | — | string | — | Radius sudut: piksel atau persen |
+| `--match-tone` | — | path | — | Referensi histogram tone matching |
+| `--match-color` | — | path | — | Referensi LAB color transfer |
 | `--brightness` | — | float | `1.0` | Kecerahan |
 | `--contrast` | — | float | `1.0` | Kontras |
 | `--saturation` | — | float | `1.0` | Saturasi |
 | `--temperature` | — | int | `0` | Suhu warna |
+| `--jobs` | `-j` | int | `1` | Jumlah worker paralel |
+| `--dry-run` | — | flag | `false` | Preview tanpa menulis file |
+
+---
+
+## Struktur Proyek
+
+```
+imgconv/           # Package utama
+├── __init__.py
+├── __main__.py    # Entry point: python -m imgconv
+├── cli.py         # Argument parsing dan main()
+├── pipeline.py    # Pipeline process_image() dan worker paralel
+├── crop.py        # Smart crop (entropy, face detection)
+├── color.py       # Color grading, tone/color matching, LAB conversions
+├── transforms.py  # Resize, rotate, flip, padding, rounded corners
+├── formats.py     # Format conversion helpers
+└── presets.py     # Konstanta: SUPPORTED_FORMATS, TONE_PRESETS, CROP_PRESETS
+
+imgconv.py         # Shim backward-compatible (python imgconv.py ...)
+requirements.txt   # Dependencies
+pyproject.toml     # Build config + optional deps
+```

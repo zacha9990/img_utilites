@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "imgconv"
+version = "0.2.0"
+description = "CLI tool for image resize, smart crop, format conversion, and color grading"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = [
+    "Pillow>=9.0.0",
+]
+
+[project.optional-dependencies]
+recommended = [
+    "numpy>=1.20.0",
+    "tqdm>=4.60.0",
+]
+full = [
+    "numpy>=1.20.0",
+    "tqdm>=4.60.0",
+    "opencv-python>=4.5.0",
+]
+
+[project.scripts]
+imgconv = "imgconv.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["imgconv*"]

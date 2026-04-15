@@ -1,0 +1,11 @@
+# Required
+Pillow>=9.0.0
+
+# Recommended — enables LAB-space color matching and faster tone matching
+numpy>=1.20.0
+
+# Optional — enables tqdm progress bar for batch processing
+tqdm>=4.60.0
+
+# Optional — enables face-aware smart crop
+opencv-python>=4.5.0
