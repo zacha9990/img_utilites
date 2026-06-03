@@ -171,7 +171,7 @@ Combined examples:
                         help=f"Color tone preset: {tone_list}")
     parser.add_argument("--radius", metavar="N",
                         help="Rounded corner radius: pixels (30) or percent of shorter side (5%%). "
-                             "Output auto-switches to PNG/WebP/AVIF if needed.")
+                             "Unsupported transparency formats auto-switch to PNG.")
     parser.add_argument("--match-tone", metavar="REF", dest="match_tone",
                         help="Match tone+color from reference via histogram (CDF) matching")
     parser.add_argument("--match-color", metavar="REF", dest="match_color",

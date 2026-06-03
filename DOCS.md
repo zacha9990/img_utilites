@@ -62,11 +62,21 @@ pip install -r requirements.txt
 pip install ".[full]"
 ```
 
+**Install package dan command `imgconv`:**
+
+```bash
+pip install .
+# atau dengan dependensi opsional lengkap
+pip install ".[full]"
+```
+
 ---
 
 ## Penggunaan Dasar
 
 ```bash
+imgconv <input> [opsi...]
+# atau tanpa instalasi package
 python imgconv.py <input> [opsi...]
 # atau lewat package
 python -m imgconv <input> [opsi...]
@@ -141,7 +151,7 @@ Fit gambar ke ukuran tertentu **tanpa crop** — area kosong diisi padding (warn
 ### Catatan
 
 - `--pad` hanya berlaku jika `--size WxH` (kedua dimensi harus ditentukan)
-- `--pad-color transparent` menghasilkan RGBA; output auto-switch ke PNG/WebP jika format tidak mendukung alpha
+- `--pad-color transparent` menghasilkan RGBA; gunakan output PNG, WebP, atau AVIF untuk mempertahankan transparansi
 - `--no-upscale` + `--pad` = konten gambar tidak diperbesar, tapi canvas tetap dicapai ukuran penuh
 
 ### Contoh
@@ -289,7 +299,7 @@ python imgconv.py *.jpg --strip-exif --output ./clean/
 
 ## Fitur: Rounded Corners
 
-Membuat pojok gambar melengkung (area sudut transparan). Output otomatis ke PNG/WebP/AVIF.
+Membuat pojok gambar melengkung (area sudut transparan). Jika format tujuan tidak mendukung transparansi, output otomatis disimpan sebagai PNG.
 
 ### Opsi
 
@@ -417,6 +427,8 @@ python imgconv.py *.jpg --tone warm --output ./output/
 python imgconv.py *.jpg --tone warm --dry-run    # cek dulu sebelum proses
 ```
 
+Tanpa `--output`, file disimpan di sebelah input dengan nama otomatis berdasarkan operasi. Jika path output sama dengan input dan `--overwrite` tidak diberikan, suffix `_out` ditambahkan agar file asli tidak tertimpa.
+
 ---
 
 ## Batch Processing
@@ -494,4 +506,5 @@ imgconv/           # Package utama
 imgconv.py         # Shim backward-compatible (python imgconv.py ...)
 requirements.txt   # Dependencies
 pyproject.toml     # Build config + optional deps
+.gitignore         # File lokal dan artefak build yang tidak dilacak Git
 ```

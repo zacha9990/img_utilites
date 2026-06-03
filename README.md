@@ -19,6 +19,7 @@ pip install -r requirements.txt
 Atau via pyproject.toml:
 
 ```bash
+pip install .
 pip install ".[full]"                 # Pillow + numpy + tqdm + opencv
 pip install ".[recommended]"          # Pillow + numpy + tqdm
 ```
@@ -26,6 +27,8 @@ pip install ".[recommended]"          # Pillow + numpy + tqdm
 ## Penggunaan
 
 ```bash
+imgconv <input> [opsi...]
+# atau tanpa instalasi package
 python imgconv.py <input> [opsi...]
 # atau
 python -m imgconv <input> [opsi...]
